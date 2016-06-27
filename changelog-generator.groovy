@@ -11,23 +11,31 @@ println ""
 
 def user = System.getenv("GITHUB_USERNAME")
 def token = System.getenv("GITHUB_TOKEN")
+def githubApi = System.getenv("GITHUB_API")
 
 if(!user || !token) {
-    println "You need to define the following environment variables before using this script: GITHUB_USERNAME, GITHUB_TOKEN"
+    println "You need to define the following environment variables before using this script: GITHUB_USERNAME, GITHUB_TOKEN and optionally GITHUB_API."
     return
 }
 
+if(!githubApi) {
+    githubApi = "https://api.github.com"
+}
+
+//Verify Arguments
 if(args.length != 3) {
-    println "Usage: groovy changelog-generator.groovy GITHUB_REPO_URL TAG_START TAG_END"
+    println "Usage: groovy changelog-generator.groovy GITHUB_REPO_NAME TAG_START TAG_END"
     return
 }
 
-def repoUrl = args[0]
+//Arguments
+def githubRepoName = args[0]
 def tagStart = args[1]
 def tagEnd = args[2]
+def repoApiUrl = "${githubApi}/repos/${githubRepoName}"
 
-
-println "Github Repo URL: ${repoUrl}"
+//Print environment data
+println "Repo API URL: ${repoApiUrl}"
 println "Start Tag: ${tagStart}"
 println "End Tag: ${tagEnd}"
 println ""
@@ -40,14 +48,22 @@ def commits = logResult.split("\\r?\\n")
 println "Done."
 
 
+def slurper = new groovy.json.JsonSlurper()
+def encodedAuth = "${user}:${token}".getBytes().encodeBase64().toString()
+
+
+println "Getting Repo Information from Github..."
+URLConnection repoInfoConnection = new URL("${repoApiUrl}").openConnection();
+repoInfoConnection.setRequestProperty("Authorization", "Basic ${encodedAuth}");
+def repoInfoResponse = slurper.parse(new BufferedReader(new InputStreamReader(repoInfoConnection.getInputStream())))
+println "Done."
+
+
 
 println "Getting Pull Requests from Github..."
-def slurper = new groovy.json.JsonSlurper()
-def prsUrl = new URL("${repoUrl}/pulls?state=all")
-def encodedAuth = "${user}:${token}".getBytes().encodeBase64().toString()
-URLConnection connection = prsUrl.openConnection();
-connection.setRequestProperty("Authorization", "Basic ${encodedAuth}");
-def prResponse = slurper.parse(new BufferedReader(new InputStreamReader(connection.getInputStream())))
+URLConnection prConnection = new URL("${repoApiUrl}/pulls?state=all").openConnection();
+prConnection.setRequestProperty("Authorization", "Basic ${encodedAuth}");
+def prResponse = slurper.parse(new BufferedReader(new InputStreamReader(prConnection.getInputStream())))
 println "Done."
 
 
@@ -59,6 +75,9 @@ sb.append("# Change Log")
 sb.append("\n\n")
 
 sb.append("## Version ${tagEnd}:")
+sb.append("\n")
+
+sb.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${tagStart}...${tagEnd})")
 sb.append("\n\n")
 
 sb.append("**Merged Pull Requests:**")
