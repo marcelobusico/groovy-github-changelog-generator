@@ -135,7 +135,7 @@ def executeGenerator() {
 		    if(issue.labels) {
 		        //Pull Request has labels
 		        for(def label : issue.labels) {
-			    includePullInLabel(pullsByLabel, "Merged Pull Requests with label ${label.name}", pr)
+			    includePullInLabel(pullsByLabel, "Merged Pull Requests - Label '${label.name}'", pr)
 			}
 		    } else {
 		        //Pull Request does not have labels
