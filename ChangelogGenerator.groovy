@@ -31,14 +31,24 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     def token = getGithubToken()        
     def encodedAuth = "${user}:${token}".getBytes().encodeBase64().toString()
 	
-    URLConnection connection = new URL(url).openConnection();
-    connection.setRequestProperty("Authorization", "Basic ${encodedAuth}");
+    URLConnection connection = new URL(url).openConnection()
+    connection.setRequestProperty("Authorization", "Basic ${encodedAuth}")
     def response = slurper.parse(new BufferedReader(new InputStreamReader(connection.getInputStream())))
     
     println "Done."
     println ""
     
     return response
+}
+
+def includePullInLabel(def prsByLabel, String label, def pr) {
+    if(!prsByLabel[label]) {
+        prsByLabel[label] = []
+    }
+    
+    prsByLabel[label] += pr
+    
+    return prsByLabel
 }
 
 def executeGenerator() {
@@ -57,7 +67,7 @@ def executeGenerator() {
 
     //Verify Arguments
     if(args.length != 3) {
-	println "Usage: groovy changelog-generator.groovy GITHUB_REPO_NAME TAG_START TAG_END"
+	println "Usage: groovy ChangelogGenerator.groovy GITHUB_REPO_NAME TAG_START TAG_END"
 	return
     }
     
@@ -75,6 +85,7 @@ def executeGenerator() {
     println ""
 
 
+    //Get Local Git Data
     println "Getting commits from current local Git working copy..."
     def logCmd = "git log ${tagStart}..${tagEnd} --pretty=format:%H --merges"
     def logResult = logCmd.execute().text
@@ -83,23 +94,59 @@ def executeGenerator() {
     println ""
 
     
+    //Get GitHub Data
     def repoInfoResponse = getResourceFromGithub(repoApiUrl, "")
-    def prResponse = getResourceFromGithub(repoApiUrl, "/pulls?state=all")
+    def prResponse = getResourceFromGithub(repoApiUrl, "/pulls?state=closed")
+    def issuesResponse = getResourceFromGithub(repoApiUrl, "/issues?state=closed")
     def tagsResponse = getResourceFromGithub(repoApiUrl, "/tags")
-
-    def endTagCommitSha = null
     
+
+    def endTagCommitSha = null    
     for(def tag : tagsResponse) {
 	if(tag.name.equals(tagEnd)) {
 	    endTagCommitSha = tag.commit.sha
 	    break
 	}
-    }
-    
-    def tagCommitResponse = getResourceFromGithub(repoApiUrl, "/commits/${endTagCommitSha}")
-    
+    }    
+    def tagCommitResponse = getResourceFromGithub(repoApiUrl, "/commits/${endTagCommitSha}")    
     def tagEndDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss'Z'", tagCommitResponse.commit.author.date)
 
+    
+    //Include only pull requests for commits of this version.
+    def versionPullRequests = []       
+    for(def commitSha : commits) {
+	for(def pr in prResponse) {
+	    if(commitSha.equals(pr.merge_commit_sha)) {
+	        versionPullRequests += pr
+	    }
+	}
+    }
+
+    def pullsByLabel = [:]
+    
+    //Group pull requests using labels
+    for(def issue : issuesResponse) {
+        if(issue.pull_request) {
+	    //This issue is a pull request
+	    for(def pr : versionPullRequests) {
+	        if(pr.url.equals(issue.pull_request.url)) {
+		    //This issue is for this pull request
+		    
+		    if(issue.labels) {
+		        //Pull Request has labels
+		        for(def label : issue.labels) {
+			    includePullInLabel(pullsByLabel, "Merged Pull Requests with label ${label.name}", pr)
+			}
+		    } else {
+		        //Pull Request does not have labels
+		        includePullInLabel(pullsByLabel, "Merged Pull Requests", pr)
+		    }
+		}
+	    }
+	}
+    }
+    
+    
     println "Processing changelog..."
     StringBuilder sb = new StringBuilder()
 
@@ -110,18 +157,17 @@ def executeGenerator() {
     sb.append("\n")
 
     sb.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${tagStart}...${tagEnd})")
-    sb.append("\n\n")
+    sb.append("\n")
 
-    sb.append("**Merged Pull Requests:**")
-    sb.append("\n\n")
+    for(def pulls : pullsByLabel) {
+	sb.append("\n")
+	sb.append("**${pulls.key}:**")
+	sb.append("\n\n")
 
-    for(def commitSha : commits) {
-	for(def pr in prResponse) {
-	    if(commitSha.equals(pr.merge_commit_sha)) {
-		sb.append("- ${pr.title} [\\#${pr.number}](${pr.html_url}) ([${pr.user.login}](${pr.user.html_url}))")
-		sb.append("\n")
-	    }
-	}
+	for(def pr : pulls.value) {
+	    sb.append("- ${pr.title} [\\#${pr.number}](${pr.html_url}) ([${pr.user.login}](${pr.user.html_url}))")
+	    sb.append("\n")
+	}      
     }
 
     String changeLog = sb.toString()
