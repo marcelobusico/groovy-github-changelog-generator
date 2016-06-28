@@ -106,7 +106,7 @@ def executeGenerator() {
     sb.append("# Change Log")
     sb.append("\n\n")
 
-    sb.append("## [${tagEnd}](${repoInfoResponse.html_url}/tree/${tagEnd}) (${tagEndDate.format('yyyy-MM-dd')}):")
+    sb.append("## [${tagEnd}](${repoInfoResponse.html_url}/tree/${tagEnd}) (${tagEndDate.format('yyyy-MM-dd')})")
     sb.append("\n")
 
     sb.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${tagStart}...${tagEnd})")
