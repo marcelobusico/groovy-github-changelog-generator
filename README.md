@@ -23,16 +23,12 @@ groovy PATH_TO_GENERATOR_SCRIPT/ChangelogGenerator.groovy marcelobusico/changelo
 ## [v2.0.2](https://github.com/marcelobusico/changelog-testing-repo/tree/v2.0.2) (2016-06-23)
 [Full Changelog](https://github.com/marcelobusico/changelog-testing-repo/compare/v1.0...v2.0.2)
 
-**Merged Pull Requests - Label 'bug':**
+**Bug fixes:**
 
 - Some fix in rel 2.0 PR [\#9](https://github.com/marcelobusico/changelog-testing-repo/pull/9) ([marcelobusico](https://github.com/marcelobusico))
 - Release 2.0 - Fix 1 - PR Title [\#7](https://github.com/marcelobusico/changelog-testing-repo/pull/7) ([marcelobusico](https://github.com/marcelobusico))
 
-**Merged Pull Requests - Label 'help wanted':**
-
-- Some fix in rel 2.0 PR [\#9](https://github.com/marcelobusico/changelog-testing-repo/pull/9) ([marcelobusico](https://github.com/marcelobusico))
-
-**Merged Pull Requests - Label 'enhancement':**
+**Enhancements:**
 
 - Feature C Pull Request Title [\#6](https://github.com/marcelobusico/changelog-testing-repo/pull/6) ([marcelobusico](https://github.com/marcelobusico))
 
