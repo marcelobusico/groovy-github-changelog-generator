@@ -41,14 +41,32 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     return response
 }
 
-def includePullInLabel(def prsByLabel, String label, def pr) {
-    if(!prsByLabel[label]) {
-        prsByLabel[label] = []
+def includePullInLabel(def pullByLabel, def labelTitles, String label, def pr) {
+    String labelTitle   
+    if(labelTitles.keySet().contains(label)) {
+	labelTitle = labelTitles[label]
+    } else {
+	labelTitle = labelTitles["GENERIC_LABEL"]
+    }
+
+    if(!pullByLabel[labelTitle]) {
+        pullByLabel[labelTitle] = []
     }
     
-    prsByLabel[label] += pr
+    pullByLabel[labelTitle] += pr
     
-    return prsByLabel
+    return pullByLabel
+}
+
+def getLabelTitlesMap() {
+    return [
+        "analytics": "Analytics changes",
+	"bug": "Bug fixes",
+	"crash": "Crash fixes",
+	"enhancement": "Enhancements",
+	"translation": "Translations",
+	"GENERIC_LABEL": "Merged Pull Requests"
+    ]
 }
 
 def executeGenerator() {
@@ -122,9 +140,14 @@ def executeGenerator() {
 	}
     }
 
-    def pullsByLabel = [:]
     
     //Group pull requests using labels
+    def labelTitles = getLabelTitlesMap()
+    def pullsByLabel = [:]
+    for(def labelTitle : labelTitles.entrySet()) {
+	pullsByLabel[labelTitle.value] = []
+    }
+    
     for(def issue : issuesResponse) {
         if(issue.pull_request) {
 	    //This issue is a pull request
@@ -132,14 +155,22 @@ def executeGenerator() {
 	        if(pr.url.equals(issue.pull_request.url)) {
 		    //This issue is for this pull request
 		    
+		    boolean isIncludedInAtLeastOneLabel = false
+		    
 		    if(issue.labels) {
 		        //Pull Request has labels
 		        for(def label : issue.labels) {
-			    includePullInLabel(pullsByLabel, "Merged Pull Requests - Label '${label.name}'", pr)
+			    if(label.name in labelTitles.keySet()) {
+			        //PR label is one of the mapped one.
+				isIncludedInAtLeastOneLabel = true
+				includePullInLabel(pullsByLabel, labelTitles, "${label.name}", pr)			      
+			    }
 			}
-		    } else {
-		        //Pull Request does not have labels
-		        includePullInLabel(pullsByLabel, "Merged Pull Requests", pr)
+		    }
+		    
+		    if(!isIncludedInAtLeastOneLabel) {
+		        //Pull Request does not have any label or those labels are not in the titles map.
+		        includePullInLabel(pullsByLabel, labelTitles, "", pr)
 		    }
 		}
 	    }
@@ -160,14 +191,17 @@ def executeGenerator() {
     sb.append("\n")
 
     for(def pulls : pullsByLabel) {
-	sb.append("\n")
-	sb.append("**${pulls.key}:**")
-	sb.append("\n\n")
-
-	for(def pr : pulls.value) {
-	    sb.append("- ${pr.title} [\\#${pr.number}](${pr.html_url}) ([${pr.user.login}](${pr.user.html_url}))")
+	if(pulls.value) {
+	    //There is at least one PR in this group
 	    sb.append("\n")
-	}      
+	    sb.append("**${pulls.key}:**")
+	    sb.append("\n\n")
+
+	    for(def pr : pulls.value) {
+		sb.append("- ${pr.title} [\\#${pr.number}](${pr.html_url}) ([${pr.user.login}](${pr.user.html_url}))")
+		sb.append("\n")
+	    }
+	}
     }
 
     String changeLog = sb.toString()
