@@ -8,15 +8,16 @@ Git &amp; Github Changelog Generator in Groovy
 
 # Usage
 
-groovy ChangelogGenerator.groovy GITHUB_REPO_NAME TAG_START TAG_END
+groovy ChangelogGenerator.groovy TAG_START TAG_END
 
 # Sample Command
 
 - Tested only in Ubuntu Linux.
 - You need to set the environment variables: GITHUB_USERNAME and GITHUB_TOKEN and optionally GITHUB_API.
+- Github repository is inferred using the first remote available of your git working copy.
 - You must run the script under a Git working copy folder, in this case this is a clone of https://github.com/marcelobusico/changelog-testing-repo
 
-groovy PATH_TO_GENERATOR_SCRIPT/ChangelogGenerator.groovy marcelobusico/changelog-testing-repo v1.0 v2.0.2
+groovy PATH_TO_GENERATOR_SCRIPT/ChangelogGenerator.groovy v1.0 v2.0.2
 
 # Sample CHANGELOG.md
 

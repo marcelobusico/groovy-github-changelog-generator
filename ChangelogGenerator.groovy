@@ -84,16 +84,32 @@ def executeGenerator() {
     }
 
     //Verify Arguments
-    if(args.length != 3) {
-	println "Usage: groovy ChangelogGenerator.groovy GITHUB_REPO_NAME TAG_START TAG_END"
+    if(args.length != 2) {
+	println "Usage: groovy ChangelogGenerator.groovy TAG_START TAG_END"
 	return
     }
     
     //Arguments
-    def githubRepoName = args[0]
-    def tagStart = args[1]
-    def tagEnd = args[2]
+    def tagStart = args[0]
+    def tagEnd = args[1]
     def githubApi = getGithubApi()
+
+    
+    //Determine Repo Name 
+    //using first result of 'git remote' of local git working copy.
+    def gitRemoteCmd = "git remote -v"
+    def gitRemoteResult = gitRemoteCmd.execute().text
+    def gitRemotes = gitRemoteResult.split("\\r?\\n")
+    
+    if(!gitRemotes) {
+	println "This git working copy has not any remote configured."
+	return
+    }
+    
+    def firstRemote = gitRemotes[0]    
+    //Trim remote name and only keep repo name.
+    def githubRepoName = (firstRemote =~ /(.+):(.+).git(.+)/)[0][2]
+    //Generate Repo API Url    
     def repoApiUrl = "${githubApi}/repos/${githubRepoName}"
 
     //Print environment data
