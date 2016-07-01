@@ -147,8 +147,8 @@ def executeGenerator() {
     }
     
     def firstRemote = gitRemotes[0]    
-    //Trim remote name and only keep repo name.
-    def githubRepoName = (firstRemote =~ /(?:http[s]?:\\/\\/)?([^\\/\s]+\\/)(.*)(?:.git)/)[0][2]
+    //Trim remote name and only keep repo name (supports Github HTTPS and SSH protocols)
+    def githubRepoName = (firstRemote =~ /(.+)[\/:](.+\/.+).git(.+)/)[0][2]
     //Generate Repo API Url    
     def repoApiUrl = "${githubApi}/repos/${githubRepoName}"
 
