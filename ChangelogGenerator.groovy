@@ -41,11 +41,6 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     return response
 }
 
-def getCommitFromGitHub(String repoApiUrl, String commitSha) {   
-    def commit = getResourceFromGithub(repoApiUrl, "/commits/${commitSha}")
-    return commit
-}
-
 def includePullInLabel(def pullByLabel, String label, def pr) {    
     String labelToUse
     if(pullByLabel.keySet().contains(label)) {
@@ -176,9 +171,9 @@ def executeGenerator() {
     //Include only pull requests for commits of this version.
     def versionPullRequests = []       
     for(def commitSha : commits) {
-        def commit = getCommitFromGitHub(repoApiUrl, commitSha)
+        def githubCommit = getResourceFromGithub(repoApiUrl, "/commits/${commitSha}")
 
-        for (def parent : commit.parents) {
+        for (def parent : githubCommit.parents) {
             pr = prResponse.find { it.head.sha == parent.sha }
             if (pr != null) {
                 versionPullRequests += pr
