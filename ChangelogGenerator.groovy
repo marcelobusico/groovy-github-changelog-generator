@@ -41,32 +41,50 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     return response
 }
 
-def includePullInLabel(def pullByLabel, def labelTitles, String label, def pr) {
-    String labelTitle   
-    if(labelTitles.keySet().contains(label)) {
-	labelTitle = labelTitles[label]
+def includePullInLabel(def pullByLabel, String label, def pr) {    
+    String labelToUse
+    if(pullByLabel.keySet().contains(label)) {
+	labelToUse = label
     } else {
-	labelTitle = labelTitles["GENERIC_LABEL"]
-    }
-
-    if(!pullByLabel[labelTitle]) {
-        pullByLabel[labelTitle] = []
+	labelToUse = "GENERIC_LABEL"
     }
     
-    pullByLabel[labelTitle] += pr
+    pullByLabel[labelToUse] += pr
     
     return pullByLabel
 }
 
-def getLabelTitlesMap() {
-    return [
-        "analytics": "Analytics changes",
-	"bug": "Bug fixes",
-	"crash": "Crash fixes",
-	"enhancement": "Enhancements",
-	"translation": "Translations",
-	"GENERIC_LABEL": "Merged Pull Requests"
-    ]
+def getLabelTitleMappings() {
+    def defaultMappingJson = '{"mappings":[{"label":"analytics","title":"Analytics changes"},{"label":"bug","title":"Bug fixes"},{"label":"crash","title":"Crash fixes"},{"label":"enhancement","title":"Enhancements"},{"label":"translation","title":"Translations"},{"label":"GENERIC_LABEL","title":"Merged Pull Requests"}]}'
+
+    def slurper = new groovy.json.JsonSlurper()
+    def labelMappingsFile = new File('changelog-label-mappings.json')
+    
+    def labelMappingJsonContent
+    if(labelMappingsFile.exists()) {
+        //Use Mapping File
+	labelMappingJsonContent = new File('changelog-label-mappings.json').text
+    }else {
+        //Use default mapping
+	labelMappingJsonContent = defaultMappingJson
+    }
+    
+    def labelMappings = slurper.parseText(labelMappingJsonContent)
+
+    return labelMappings.mappings
+}
+
+def getTitleForLabel(def labelTitleMappings, String label) {
+    def title = "Unknown title"
+    
+    for(def labelTitleMapping : labelTitleMappings) {
+	if(label.equals(labelTitleMapping.label)) {
+	    title = labelTitleMapping.title
+	    break;
+	}
+    }
+    
+    return title
 }
 
 def executeGenerator() {
@@ -112,10 +130,14 @@ def executeGenerator() {
     //Generate Repo API Url    
     def repoApiUrl = "${githubApi}/repos/${githubRepoName}"
 
+    //Load Label Mappings
+    def labelTitleMappings = getLabelTitleMappings()
+	
     //Print environment data
     println "Repo API URL: ${repoApiUrl}"
     println "Start Tag: ${tagStart}"
     println "End Tag: ${tagEnd}"
+    println "Label Mappings: ${labelTitleMappings}"
     println ""
 
 
@@ -158,10 +180,9 @@ def executeGenerator() {
 
     
     //Group pull requests using labels
-    def labelTitles = getLabelTitlesMap()
     def pullsByLabel = [:]
-    for(def labelTitle : labelTitles.entrySet()) {
-	pullsByLabel[labelTitle.value] = []
+    for(def labelTitleMapping : labelTitleMappings) {
+	pullsByLabel[labelTitleMapping.label] = []
     }
     
     for(def issue : issuesResponse) {
@@ -176,17 +197,17 @@ def executeGenerator() {
 		    if(issue.labels) {
 		        //Pull Request has labels
 		        for(def label : issue.labels) {
-			    if(label.name in labelTitles.keySet()) {
+			    if(label.name in pullsByLabel.keySet()) {
 			        //PR label is one of the mapped one.
 				isIncludedInAtLeastOneLabel = true
-				includePullInLabel(pullsByLabel, labelTitles, "${label.name}", pr)			      
+				includePullInLabel(pullsByLabel, "${label.name}", pr)			      
 			    }
 			}
 		    }
 		    
 		    if(!isIncludedInAtLeastOneLabel) {
 		        //Pull Request does not have any label or those labels are not in the titles map.
-		        includePullInLabel(pullsByLabel, labelTitles, "", pr)
+		        includePullInLabel(pullsByLabel, "", pr)
 		    }
 		}
 	    }
@@ -210,7 +231,7 @@ def executeGenerator() {
 	if(pulls.value) {
 	    //There is at least one PR in this group
 	    sb.append("\n")
-	    sb.append("**${pulls.key}:**")
+	    sb.append("**${getTitleForLabel(labelTitleMappings, pulls.key)}:**")
 	    sb.append("\n\n")
 
 	    for(def pr : pulls.value) {
