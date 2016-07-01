@@ -41,6 +41,28 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     return response
 }
 
+commitsResponse = []
+commitPage = 1
+
+def getCommitFromGitHub(String repoApiUrl, String commitSha) {
+
+    def commit
+
+    if (commitsResponse.size() > 0) {
+        commit = commitsResponse.find { it.sha == commitSha }
+    }
+
+    if (commit == null) {
+        if (commitPage == 50) {
+            throw new Exception("Max number of pages reached trying to search a specific commit")
+        }
+        commitsResponse += getResourceFromGithub(repoApiUrl, "/commits?page=" + commitPage + "&per_page=100")
+        commitPage++
+        commit = getCommitFromGitHub(repoApiUrl, commitSha)
+    }
+    return commit
+}
+
 def includePullInLabel(def pullByLabel, String label, def pr) {    
     String labelToUse
     if(pullByLabel.keySet().contains(label)) {
@@ -126,7 +148,7 @@ def executeGenerator() {
     
     def firstRemote = gitRemotes[0]    
     //Trim remote name and only keep repo name.
-    def githubRepoName = (firstRemote =~ /(.+):(.+).git(.+)/)[0][2]
+    def githubRepoName = (firstRemote =~ /(?:http[s]?:\\/\\/)?([^\\/\s]+\\/)(.*)(?:.git)/)[0][2]
     //Generate Repo API Url    
     def repoApiUrl = "${githubApi}/repos/${githubRepoName}"
 
@@ -152,7 +174,7 @@ def executeGenerator() {
     
     //Get GitHub Data
     def repoInfoResponse = getResourceFromGithub(repoApiUrl, "")
-    def prResponse = getResourceFromGithub(repoApiUrl, "/pulls?state=closed")
+    def prResponse = getResourceFromGithub(repoApiUrl, "/pulls?state=closed&page=1&per_page=100")
     def issuesResponse = getResourceFromGithub(repoApiUrl, "/issues?state=closed")
     def tagsResponse = getResourceFromGithub(repoApiUrl, "/tags")
     
@@ -171,11 +193,14 @@ def executeGenerator() {
     //Include only pull requests for commits of this version.
     def versionPullRequests = []       
     for(def commitSha : commits) {
-	for(def pr in prResponse) {
-	    if(commitSha.equals(pr.merge_commit_sha)) {
-	        versionPullRequests += pr
-	    }
-	}
+        def commit = getCommitFromGitHub(repoApiUrl, commitSha)
+
+        for (def parent : commit.parents) {
+            pr = prResponse.find { it.head.sha == parent.sha }
+            if (pr != null) {
+                versionPullRequests += pr
+            }
+        }
     }
 
     
