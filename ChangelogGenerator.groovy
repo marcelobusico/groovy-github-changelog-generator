@@ -41,25 +41,8 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     return response
 }
 
-commitsResponse = []
-commitPage = 1
-
-def getCommitFromGitHub(String repoApiUrl, String commitSha) {
-
-    def commit
-
-    if (commitsResponse.size() > 0) {
-        commit = commitsResponse.find { it.sha == commitSha }
-    }
-
-    if (commit == null) {
-        if (commitPage == 50) {
-            throw new Exception("Max number of pages reached trying to search a specific commit")
-        }
-        commitsResponse += getResourceFromGithub(repoApiUrl, "/commits?page=" + commitPage + "&per_page=100")
-        commitPage++
-        commit = getCommitFromGitHub(repoApiUrl, commitSha)
-    }
+def getCommitFromGitHub(String repoApiUrl, String commitSha) {   
+    def commit = getResourceFromGithub(repoApiUrl, "/commits/${commitSha}")
     return commit
 }
 
