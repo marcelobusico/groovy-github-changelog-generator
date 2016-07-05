@@ -41,21 +41,23 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     return response
 }
 
-def includePullInLabel(def pullByLabel, String label, def pr) {    
-    String labelToUse
-    if(pullByLabel.keySet().contains(label)) {
-	labelToUse = label
+def includePullInLabel(def pullByTitle, def labelTitleMappings, String labelTitle, def pr) {    
+    String titleToUse
+    if(labelTitle && pullByTitle.keySet().contains(labelTitle)) {
+	titleToUse = labelTitle
     } else {
-	labelToUse = "GENERIC_LABEL"
+	titleToUse = getTitleForLabel(labelTitleMappings, "GENERIC_LABEL")
     }
     
-    pullByLabel[labelToUse] += pr
+    println titleToUse
     
-    return pullByLabel
+    pullByTitle[titleToUse] += pr
+    
+    return pullByTitle
 }
 
 def getLabelTitleMappings() {
-    def defaultMappingJson = '{"mappings":[{"label":"analytics","title":"Analytics changes"},{"label":"bug","title":"Bug fixes"},{"label":"crash","title":"Crash fixes"},{"label":"enhancement","title":"Enhancements"},{"label":"translation","title":"Translations"},{"label":"GENERIC_LABEL","title":"Merged Pull Requests"}]}'
+    def defaultMappingJson = '{"mappings":[{"labels":["analytics"],"title":"Analytics changes"},{"labels":["bug","problem"],"title":"Bug fixes"},{"labels":["crash"],"title":"Crash fixes"},{"labels":["enhancement"],"title":"Enhancements"},{"labels":["translation"],"title":"Translations"},{"labels":["GENERIC_LABEL"],"title":"Merged Pull Requests"}]}'
 
     def slurper = new groovy.json.JsonSlurper()
     def labelMappingsFile = new File('changelog-label-mappings.json')
@@ -75,13 +77,17 @@ def getLabelTitleMappings() {
 }
 
 def getTitleForLabel(def labelTitleMappings, String label) {
-    def title = "Unknown title"
+    println "Mapping for Label ${label}: ${labelTitleMappings}"
+    def title = null
     
     for(def labelTitleMapping : labelTitleMappings) {
-	if(label.equals(labelTitleMapping.label)) {
-	    title = labelTitleMapping.title
-	    break;
+        for(def labelConf : labelTitleMapping.labels) {
+	    if(label.equals(labelConf)) {
+		title = labelTitleMapping.title
+		break;
+	    }
 	}
+
     }
     
     return title
@@ -183,9 +189,9 @@ def executeGenerator() {
 
     
     //Group pull requests using labels
-    def pullsByLabel = [:]
+    def pullByTitle = [:]
     for(def labelTitleMapping : labelTitleMappings) {
-	pullsByLabel[labelTitleMapping.label] = []
+	pullByTitle[labelTitleMapping.title] = []
     }
     
     for(def issue : issuesResponse) {
@@ -200,17 +206,18 @@ def executeGenerator() {
 		    if(issue.labels) {
 		        //Pull Request has labels
 		        for(def label : issue.labels) {
-			    if(label.name in pullsByLabel.keySet()) {
+			    String labelTitle = getTitleForLabel(labelTitleMappings, label.name)
+			    if(labelTitle in pullByTitle.keySet()) {
 			        //PR label is one of the mapped one.
 				isIncludedInAtLeastOneLabel = true
-				includePullInLabel(pullsByLabel, "${label.name}", pr)			      
+				includePullInLabel(pullByTitle, labelTitleMappings, labelTitle, pr)			      
 			    }
 			}
 		    }
 		    
 		    if(!isIncludedInAtLeastOneLabel) {
 		        //Pull Request does not have any label or those labels are not in the titles map.
-		        includePullInLabel(pullsByLabel, "", pr)
+		        includePullInLabel(pullByTitle, labelTitleMappings, null, pr)
 		    }
 		}
 	    }
@@ -230,11 +237,11 @@ def executeGenerator() {
     sb.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${tagStart}...${tagEnd})")
     sb.append("\n")
 
-    for(def pulls : pullsByLabel) {
+    for(def pulls : pullByTitle) {
 	if(pulls.value) {
 	    //There is at least one PR in this group
 	    sb.append("\n")
-	    sb.append("**${getTitleForLabel(labelTitleMappings, pulls.key)}:**")
+	    sb.append("**${pulls.key}:**")
 	    sb.append("\n\n")
 
 	    for(def pr : pulls.value) {

@@ -1,27 +1,39 @@
 {
     "mappings": [
 	{
-	    "label": "analytics",
+	    "labels": [
+		"analytics"
+	    ],
 	    "title": "Analytics changes"
 	},
 	{
-	    "label": "bug",
+	    "labels": [
+		"bug", "problem"
+	    ],
 	    "title": "Bug fixes"
 	},
 	{
-	    "label": "crash",
+	    "labels": [
+		"crash"
+	    ],
 	    "title": "Crash fixes"
 	},
 	{
-	    "label": "enhancement",
+	    "labels": [
+		"enhancement"
+	    ],
 	    "title": "Enhancements"
 	},
 	{
-	    "label": "translation",
+	    "labels": [
+		"translation"
+	    ],
 	    "title": "Translations"
 	},
 	{
-	    "label": "GENERIC_LABEL",
+	    "labels": [
+		"GENERIC_LABEL"
+	    ],
 	    "title": "Merged Pull Requests"
 	}
     ]
