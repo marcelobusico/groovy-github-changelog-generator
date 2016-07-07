@@ -17,6 +17,7 @@ groovy ChangelogGenerator.groovy TAG_START TAG_END [--create-github-release]
 - Github repository is inferred using the first remote available of your git working copy.
 - You must run the script under a Git working copy folder, in this case this is a clone of https://github.com/marcelobusico/changelog-testing-repo
 - Optionally you can add at the end of the script the modifier --create-github-release to create a new release in Github using specified tag and generated changelog.
+- If you get a 404 Not found error when creating a github release, probably you need to grant "repo" permission to your personal access token in Github settings.
 
 groovy PATH_TO_GENERATOR_SCRIPT/ChangelogGenerator.groovy v1.0 v2.0.2 --create-github-release
 
