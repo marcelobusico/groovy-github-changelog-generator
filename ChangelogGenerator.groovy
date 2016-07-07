@@ -41,6 +41,35 @@ def getResourceFromGithub(String repoApiUrl, String resource) {
     return response
 }
 
+def postDataToGithub(String repoApiUrl, String resource, def data) {
+    def url = "${repoApiUrl}${resource}"
+    def jsonBody = groovy.json.JsonOutput.toJson(data)
+    
+    println "Posting data to Github: '${url}'\nBody: ${jsonBody}"
+    
+    def slurper = new groovy.json.JsonSlurper()
+    def user = getGithubUser()
+    def token = getGithubToken()        
+    def encodedAuth = "${user}:${token}".getBytes().encodeBase64().toString()
+	
+    URLConnection connection = new URL(url).openConnection()
+    connection.setDoOutput(true)
+    connection.setRequestMethod("POST")
+    connection.setRequestProperty("Authorization", "Basic ${encodedAuth}")
+    connection.setRequestProperty("Content-Type", "application/json")
+    
+    connection.outputStream.withWriter { Writer writer ->
+        writer << jsonBody
+    }
+    
+    def response = slurper.parse(new BufferedReader(new InputStreamReader(connection.getInputStream())))
+    
+    println "Done."
+    println ""
+    
+    return response
+}
+
 def includePullInLabel(def pullByTitle, def labelTitleMappings, String labelTitle, def pr) {    
     String titleToUse
     if(labelTitle && pullByTitle.keySet().contains(labelTitle)) {
@@ -108,14 +137,16 @@ def executeGenerator() {
     }
 
     //Verify Arguments
-    if(args.length != 2) {
-	println "Usage: groovy ChangelogGenerator.groovy TAG_START TAG_END"
+    if(args.length < 2) {
+	println "Usage: groovy ChangelogGenerator.groovy TAG_START TAG_END [--create-github-release]"
 	return
     }
     
     //Arguments
     def tagStart = args[0]
     def tagEnd = args[1]
+    def createGithubRelease = args.contains("--create-github-release")
+    
     def githubApi = getGithubApi()
 
     
@@ -143,6 +174,7 @@ def executeGenerator() {
     println "Repo API URL: ${repoApiUrl}"
     println "Start Tag: ${tagStart}"
     println "End Tag: ${tagEnd}"
+    println "Create Git Release: ${createGithubRelease}"
     println "Label Mappings: ${labelTitleMappings}"
     println ""
 
@@ -226,32 +258,34 @@ def executeGenerator() {
     
     
     println "Processing changelog..."
-    StringBuilder sb = new StringBuilder()
+    StringBuilder sbChangelogTitle = new StringBuilder()
+    StringBuilder sbChangelogBody = new StringBuilder()
 
-    sb.append("# Change Log")
-    sb.append("\n\n")
+    sbChangelogTitle.append("# Change Log")
+    sbChangelogTitle.append("\n\n")
 
-    sb.append("## [${tagEnd}](${repoInfoResponse.html_url}/tree/${tagEnd}) (${tagEndDate.format('yyyy-MM-dd')})")
-    sb.append("\n")
+    sbChangelogTitle.append("## [${tagEnd}](${repoInfoResponse.html_url}/tree/${tagEnd}) (${tagEndDate.format('yyyy-MM-dd')})")
+    sbChangelogTitle.append("\n")
 
-    sb.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${tagStart}...${tagEnd})")
-    sb.append("\n")
+    sbChangelogBody.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${tagStart}...${tagEnd})")
+    sbChangelogBody.append("\n")
 
     for(def pulls : pullByTitle) {
 	if(pulls.value) {
 	    //There is at least one PR in this group
-	    sb.append("\n")
-	    sb.append("**${pulls.key}:**")
-	    sb.append("\n\n")
+	    sbChangelogBody.append("\n")
+	    sbChangelogBody.append("**${pulls.key}:**")
+	    sbChangelogBody.append("\n\n")
 
 	    for(def pr : pulls.value) {
-		sb.append("- ${pr.title} [\\#${pr.number}](${pr.html_url}) ([${pr.user.login}](${pr.user.html_url}))")
-		sb.append("\n")
+		sbChangelogBody.append("- ${pr.title} [\\#${pr.number}](${pr.html_url}) ([${pr.user.login}](${pr.user.html_url}))")
+		sbChangelogBody.append("\n")
 	    }
 	}
     }
 
-    String changeLog = sb.toString()
+    String changelogTitle = sbChangelogTitle.toString()
+    String changelogBody = sbChangelogBody.toString()
     println "Done."
 
 
@@ -261,7 +295,8 @@ def executeGenerator() {
     println "Generated Changelog:"
     println "--------------------"
     println ""
-    println changeLog
+    println changelogTitle
+    println changelogBody
     println "--------------------"
     println ""
     println ""
@@ -279,7 +314,8 @@ def executeGenerator() {
 
 
     println "Writing CHANGELOG.md file..."
-    changelogFile.write(changeLog)
+    changelogFile.write(changelogTitle)
+    changelogFile.append(changelogBody)
     if(currentContent) {
 	changelogFile.append("\n")
 	currentContent.eachLine { line, count ->
@@ -298,6 +334,31 @@ def executeGenerator() {
     println "Changelog generation completed."
     println "-------------------------------"
     println ""
+    
+    
+    if(createGithubRelease) {
+        generateGithubRelease(repoApiUrl, tagEnd, changelogBody)
+    }
+}
+
+def generateGithubRelease(String repoApiUrl, String tagName, String changelog) {
+    println ""
+    println "--------------------------"
+    println "Creating Github Release..."
+    println "--------------------------"
+    println ""
+
+    postDataToGithub(repoApiUrl, "/releases", [
+	"tag_name": tagName,
+	"name": tagName,
+	"body": changelog
+    ])
+    
+    println ""
+    println "-----------------------"
+    println "Github release created."
+    println "-----------------------"
+    println ""    
 }
 
 executeGenerator()
