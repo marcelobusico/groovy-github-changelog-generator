@@ -122,6 +122,20 @@ def getTitleForLabel(def labelTitleMappings, String label) {
     return title
 }
 
+String getCommandLineArgumentValueForKey(String[] args, String argumentName) {
+    String argumentValue = null
+    String argumentRegex = "^--${argumentName}=(.+)\$"    
+    
+    for(String arg : args) {
+	if(arg =~ /${argumentRegex}/) {
+	    argumentValue = (arg =~ /${argumentRegex}/)[0][1]
+	    break;
+	}
+    }
+    
+    return argumentValue
+}
+
 def executeGenerator() {
     println ""
     println "--------------------------------"
@@ -133,22 +147,21 @@ def executeGenerator() {
 
     if(!getGithubUser() || !getGithubToken()) {
 	println "You need to define the following environment variables before using this script: GITHUB_USERNAME, GITHUB_TOKEN and optionally GITHUB_API."
-	return
+	return 1
     }
 
-    //Verify Arguments
-    if(args.length < 2) {
-	println "Usage: groovy ChangelogGenerator.groovy TAG_START TAG_END [--create-github-release]"
-	return
-    }
-    
     //Arguments
-    def tagStart = args[0]
-    def tagEnd = args[1]
-    def createGithubRelease = args.contains("--create-github-release")
+    String tagStart = getCommandLineArgumentValueForKey(args, "start-tag")
+    String tagEnd = getCommandLineArgumentValueForKey(args, "end-tag")
+    boolean createGithubRelease = getCommandLineArgumentValueForKey(args, "create-github-release") == "true"
+    
+    //Verify Arguments
+    if(!tagEnd) {
+	println "Usage: groovy ChangelogGenerator.groovy [--start-tag=TAG_START] --end-tag=TAG_END [--create-github-release=<true/false>]"
+	return 1
+    }
     
     def githubApi = getGithubApi()
-
     
     //Determine Repo Name 
     //using first result of 'git remote' of local git working copy.
@@ -158,7 +171,7 @@ def executeGenerator() {
     
     if(!gitRemotes) {
 	println "This git working copy has not any remote configured."
-	return
+	return 1
     }
     
     def firstRemote = gitRemotes[0]    
@@ -169,24 +182,40 @@ def executeGenerator() {
 
     //Load Label Mappings
     def labelTitleMappings = getLabelTitleMappings()
-	
+    
     //Print environment data
     println "Repo API URL: ${repoApiUrl}"
-    println "Start Tag: ${tagStart}"
+    println "Start Tag: ${(tagStart ?: "<Since latest GitHub release>")}"
     println "End Tag: ${tagEnd}"
     println "Create Git Release: ${createGithubRelease}"
     println "Label Mappings: ${labelTitleMappings}"
     println ""
 
 
+    if(!tagStart) {
+	//Determine tag start automatically using latest github release
+	println "Determining Start Tag from Latest GitHub Release..."
+	def releasesResponse = getResourceFromGithub(repoApiUrl, "/releases")
+	if(releasesResponse) {
+	    tagStart = releasesResponse[0].tag_name
+	}
+	println "Calculated Start Tag is: ${tagStart}"
+	println ""
+    }
+
     //Get Local Git Data
     println "Getting commits from current local Git working copy..."
-    def logCmd = "git log ${tagStart}..${tagEnd} --pretty=format:%H --merges"
+    def logCmd = "git log ${(tagStart ? tagStart + '..' : '')}${tagEnd} --pretty=format:%H --merges"
     def logResult = logCmd.execute().text
+
+    if(!logResult) {
+	println "ERROR: There is no commits between selected tags to generate a release changelog."
+	return 1
+    }
+    
     def commits = logResult.split("\\r?\\n")
     println "Done."
     println ""
-
     
     //Get GitHub Data
     def repoInfoResponse = getResourceFromGithub(repoApiUrl, "")
@@ -207,7 +236,7 @@ def executeGenerator() {
 
     
     //Include only pull requests for commits of this version.
-    def versionPullRequests = []       
+    def versionPullRequests = []
     for(def commitSha : commits) {
         def githubCommit = getResourceFromGithub(repoApiUrl, "/commits/${commitSha}")
 
