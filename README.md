@@ -8,7 +8,7 @@ Git &amp; Github Changelog Generator in Groovy
 
 ## Usage
 
-groovy ChangelogGenerator.groovy [--start-tag=TAG_START] --end-tag=TAG_END [--create-github-release=<true/false>]
+groovy ChangelogGenerator.groovy [--start-tag=TAG_START] --end-tag=TAG_END [--create-github-release=true/false]
 
 ## Sample Command
 
