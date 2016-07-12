@@ -78,8 +78,6 @@ def includePullInLabel(def pullByTitle, def labelTitleMappings, String labelTitl
 	titleToUse = getTitleForLabel(labelTitleMappings, "GENERIC_LABEL")
     }
     
-    println titleToUse
-    
     pullByTitle[titleToUse] += pr
     
     return pullByTitle
@@ -106,7 +104,6 @@ def getLabelTitleMappings() {
 }
 
 def getTitleForLabel(def labelTitleMappings, String label) {
-    println "Mapping for Label ${label}: ${labelTitleMappings}"
     def title = null
     
     for(def labelTitleMapping : labelTitleMappings) {
@@ -147,21 +144,19 @@ def executeGenerator() {
 
     if(!getGithubUser() || !getGithubToken()) {
 	println "You need to define the following environment variables before using this script: GITHUB_USERNAME, GITHUB_TOKEN and optionally GITHUB_API."
-	return 1
+	System.exit(1)
     }
 
+    
     //Arguments
     String tagStart = getCommandLineArgumentValueForKey(args, "start-tag")
     String tagEnd = getCommandLineArgumentValueForKey(args, "end-tag")
     boolean createGithubRelease = getCommandLineArgumentValueForKey(args, "create-github-release") == "true"
+
     
-    //Verify Arguments
-    if(!tagEnd) {
-	println "Usage: groovy ChangelogGenerator.groovy [--start-tag=TAG_START] --end-tag=TAG_END [--create-github-release=<true/false>]"
-	return 1
-    }
-    
+    //Get Github API URL
     def githubApi = getGithubApi()
+    
     
     //Determine Repo Name 
     //using first result of 'git remote' of local git working copy.
@@ -171,7 +166,7 @@ def executeGenerator() {
     
     if(!gitRemotes) {
 	println "This git working copy has not any remote configured."
-	return 1
+	System.exit(1)
     }
     
     def firstRemote = gitRemotes[0]    
@@ -186,23 +181,41 @@ def executeGenerator() {
     //Print environment data
     println "Repo API URL: ${repoApiUrl}"
     println "Start Tag: ${(tagStart ?: "<Since latest GitHub release>")}"
-    println "End Tag: ${tagEnd}"
+    println "End Tag: ${(tagEnd ?: "<Till latest tag in current git branch>")}"
     println "Create Git Release: ${createGithubRelease}"
     println "Label Mappings: ${labelTitleMappings}"
     println ""
-
-
+    
+    
+    //If not set, determine start tag automatically using latest github release.
     if(!tagStart) {
-	//Determine tag start automatically using latest github release
 	println "Determining Start Tag from Latest GitHub Release..."
 	def releasesResponse = getResourceFromGithub(repoApiUrl, "/releases")
 	if(releasesResponse) {
 	    tagStart = releasesResponse[0].tag_name
 	}
-	println "Calculated Start Tag is: ${tagStart}"
+	println "Calculated Start Tag is: ${tagStart?:"<No start tag found, using first commit instead>"}"
+	println ""
+    }
+    
+    
+    //If not set, determine end tag automatically using latest tag in current git working copy branch.
+    if(!tagEnd) {
+	println "Determining End Tag from Latest tag in current Git branch..."
+	def gitLatestTagCmd = "git describe --abbrev=0 --tags"
+	def gitLatestTagResult = gitLatestTagCmd.execute().text
+	println "Done."
+	println ""
+	if(!gitLatestTagResult) {
+	    println "ERROR: There is no tag available to be used as end-tag."
+	    System.exit(1)
+	}
+	tagEnd = gitLatestTagResult.split("\\r?\\n")[0]
+	println "Calculated End Tag is: ${tagEnd}"
 	println ""
     }
 
+    
     //Get Local Git Data
     println "Getting commits from current local Git working copy..."
     def logCmd = "git log ${(tagStart ? tagStart + '..' : '')}${tagEnd} --pretty=format:%H --merges"
@@ -210,12 +223,13 @@ def executeGenerator() {
 
     if(!logResult) {
 	println "ERROR: There is no commits between selected tags to generate a release changelog."
-	return 1
+	System.exit(1)
     }
     
     def commits = logResult.split("\\r?\\n")
     println "Done."
     println ""
+    
     
     //Get GitHub Data
     def repoInfoResponse = getResourceFromGithub(repoApiUrl, "")
@@ -223,14 +237,19 @@ def executeGenerator() {
     def issuesResponse = getResourceFromGithub(repoApiUrl, "/issues?state=closed")
     def tagsResponse = getResourceFromGithub(repoApiUrl, "/tags")
     
-
     def endTagCommitSha = null    
     for(def tag : tagsResponse) {
 	if(tag.name.equals(tagEnd)) {
 	    endTagCommitSha = tag.commit.sha
 	    break
 	}
-    }    
+    }
+    
+    if(!endTagCommitSha) {
+        println "ERROR: Could not determine commit sha for tag '${tagEnd}'"
+        System.exit(1)
+    }
+    
     def tagCommitResponse = getResourceFromGithub(repoApiUrl, "/commits/${endTagCommitSha}")    
     def tagEndDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss'Z'", tagCommitResponse.commit.author.date)
 
