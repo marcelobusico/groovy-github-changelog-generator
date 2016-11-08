@@ -150,8 +150,20 @@ def executeGenerator() {
     //Arguments
     String tagStart = getCommandLineArgumentValueForKey(args, "start-tag")
     String tagEnd = getCommandLineArgumentValueForKey(args, "end-tag")
+    String commitStart = getCommandLineArgumentValueForKey(args, "start-commit")
+    String commitEnd = getCommandLineArgumentValueForKey(args, "end-commit")
     boolean createGithubRelease = getCommandLineArgumentValueForKey(args, "create-github-release") == "true"
 
+
+    if(tagStart && commitStart) {
+        println "You cannot specify start-tag and start-commit at same time."
+        System.exit(1)
+    }
+    
+    if(tagEnd && commitEnd) {
+        println "You cannot specify end-tag and end-commit at same time."
+        System.exit(1)
+    }
     
     //Get Github API URL
     def githubApi = getGithubApi()
@@ -177,29 +189,53 @@ def executeGenerator() {
     //Load Label Mappings
     def labelTitleMappings = getLabelTitleMappings()
     
-    //Print environment data
+    String resolvedStart = null
+    String resolvedEnd = null
+    
+    //Print Repo API URL
     println "Repo API URL: ${repoApiUrl}"
-    println "Start Tag: ${(tagStart ?: "<Since latest GitHub release>")}"
-    println "End Tag: ${(tagEnd ?: "<Till latest tag in current git branch>")}"
+    //Print Start Commit/Tag
+    if(commitStart) {
+        println "Start Commit: ${commitStart}"
+        resolvedStart = commitStart
+    } else if(tagStart) {
+        println "Start Tag: ${tagStart}"
+        resolvedStart = tagStart
+    } else {
+        println "Start: <Since latest GitHub release>"
+    }
+    //Print End Commit/Tag    
+    if(commitEnd) {
+        println "End Commit: ${commitEnd}"
+        resolvedEnd = commitEnd
+    } else if(tagEnd) {
+        println "End Tag: ${tagEnd}"
+        resolvedEnd = tagEnd
+    } else {
+        println "End: <Till latest tag in current git branch>"
+    }
+    //Print Create Git Release Flag
     println "Create Git Release: ${createGithubRelease}"
+    //Print Label Mappings
     println "Label Mappings: ${labelTitleMappings}"
     println ""
     
     
-    //If not set, determine start tag automatically using latest github release.
-    if(!tagStart) {
+    //If start is not set, determine start tag automatically using latest github release.
+    if(!resolvedStart) {
         println "Determining Start Tag from Latest GitHub Release..."
         def releasesResponse = getResourceFromGithub(repoApiUrl, "/releases")
         if(releasesResponse) {
             tagStart = releasesResponse[0].tag_name
+            resolvedStart = tagStart
         }
         println "Calculated Start Tag is: ${tagStart?:"<No start tag found, using first commit instead>"}"
         println ""
     }
     
     
-    //If not set, determine end tag automatically using latest tag in current git working copy branch.
-    if(!tagEnd) {
+    //If end is not set, determine end tag automatically using latest tag in current git working copy branch.
+    if(!resolvedEnd) {
         println "Determining End Tag from Latest tag in current Git branch..."
         def gitLatestTagCmd = "git describe --abbrev=0 --tags"
         def gitLatestTagResult = gitLatestTagCmd.execute().text
@@ -210,6 +246,7 @@ def executeGenerator() {
             System.exit(1)
         }
         tagEnd = gitLatestTagResult.split("\\r?\\n")[0]
+        resolvedEnd = tagEnd
         println "Calculated End Tag is: ${tagEnd}"
         println ""
     }
@@ -217,11 +254,11 @@ def executeGenerator() {
     
     //Get Local Git Data
     println "Getting commits from current local Git working copy..."
-    def logCmd = "git log ${(tagStart ? tagStart + '..' : '')}${tagEnd} --pretty=format:%H --merges"
+    def logCmd = "git log ${(resolvedStart ? resolvedStart + '..' : '')}${resolvedEnd} --pretty=format:%H --merges"
     def logResult = logCmd.execute().text
 
     if(!logResult) {
-        println "ERROR: There is no commits between selected tags to generate a release changelog."
+        println "ERROR: There is no commits between selected start and end to generate a release changelog."
         System.exit(1)
     }
     
