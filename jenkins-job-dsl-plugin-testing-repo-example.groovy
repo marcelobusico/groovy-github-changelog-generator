@@ -1,4 +1,7 @@
 job('DslBuildApp') {
+    parameters {
+        stringParam('PARAMETER_A', 'PARAMETER_VALUE', 'This is the Parameter A')
+    }
     properties {
         promotions {
             promotion {
@@ -7,19 +10,19 @@ job('DslBuildApp') {
                     manual('')
                 }
                 actions {
-                    shell('groovy /var/lib/jenkins/scripts/ChangelogGenerator.groovy --create-github-release=true')
+                    shell('groovy /var/lib/jenkins-scripts/ChangelogGenerator.groovy --create-github-release=true')
                 }
             }
-	}
+        }
     }
     scm {
-      	git {
-	    remote {
+        git {
+        remote {
                 name('origin')
                 url('git@github.com:marcelobusico/changelog-testing-repo.git')
             }
             branch('refs/heads/release-2.0')
-      	}
+        }
     }
     steps {
         shell("echo 'Hey, this is a generated build using DSL Script.'")
@@ -32,5 +35,12 @@ job('DslBuildApp') {
                 create()
             }
         }
+        postBuildScripts {
+            steps {
+                shell('/var/lib/jenkins-scripts/post-build-script.sh')
+            }
+            onlyIfBuildSucceeds(true)
+            onlyIfBuildFails(false)
+        }
     }
-} 
+}
