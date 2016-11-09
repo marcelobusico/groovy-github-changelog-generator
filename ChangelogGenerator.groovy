@@ -84,7 +84,7 @@ def includePullInLabel(def pullByTitle, def labelTitleMappings, String labelTitl
 }
 
 def getLabelTitleMappings() {
-    def defaultMappingJson = '{"mappings":[{"labels":["analytics"],"title":"Analytics changes"},{"labels":["bug","problem"],"title":"Bug fixes"},{"labels":["crash"],"title":"Crash fixes"},{"labels":["enhancement"],"title":"Enhancements"},{"labels":["translation"],"title":"Translations"},{"labels":["GENERIC_LABEL"],"title":"Merged Pull Requests"}]}'
+    def defaultMappingJson = '{"mappings":[{"labels":["user story","user-story"],"title":"User Stories"},{"labels":["analytics"],"title":"Analytics changes"},{"labels":["bug","problem","hotfix"],"title":"Bug fixes"},{"labels":["crash"],"title":"Crash fixes"},{"labels":["enhancement","improvement"],"title":"Enhancements"},{"labels":["translation"],"title":"Translations"},{"labels":["GENERIC_LABEL"],"title":"Merged Pull Requests"}]}'
 
     def slurper = new groovy.json.JsonSlurper()
     def labelMappingsFile = new File('changelog-label-mappings.json')
@@ -189,28 +189,28 @@ def executeGenerator() {
     //Load Label Mappings
     def labelTitleMappings = getLabelTitleMappings()
     
-    String resolvedStart = null
-    String resolvedEnd = null
+    String resolvedCommitOrTagStart = null
+    String resolvedCommitOrTagEnd = null
     
     //Print Repo API URL
     println "Repo API URL: ${repoApiUrl}"
     //Print Start Commit/Tag
     if(commitStart) {
         println "Start Commit: ${commitStart}"
-        resolvedStart = commitStart
+        resolvedCommitOrTagStart = commitStart
     } else if(tagStart) {
         println "Start Tag: ${tagStart}"
-        resolvedStart = tagStart
+        resolvedCommitOrTagStart = tagStart
     } else {
         println "Start: <Since latest GitHub release>"
     }
     //Print End Commit/Tag    
     if(commitEnd) {
         println "End Commit: ${commitEnd}"
-        resolvedEnd = commitEnd
+        resolvedCommitOrTagEnd = commitEnd
     } else if(tagEnd) {
         println "End Tag: ${tagEnd}"
-        resolvedEnd = tagEnd
+        resolvedCommitOrTagEnd = tagEnd
     } else {
         println "End: <Till latest tag in current git branch>"
     }
@@ -222,12 +222,12 @@ def executeGenerator() {
     
     
     //If start is not set, determine start tag automatically using latest github release.
-    if(!resolvedStart) {
+    if(!resolvedCommitOrTagStart) {
         println "Determining Start Tag from Latest GitHub Release..."
         def releasesResponse = getResourceFromGithub(repoApiUrl, "/releases")
         if(releasesResponse) {
             tagStart = releasesResponse[0].tag_name
-            resolvedStart = tagStart
+            resolvedCommitOrTagStart = tagStart
         }
         println "Calculated Start Tag is: ${tagStart?:"<No start tag found, using first commit instead>"}"
         println ""
@@ -235,7 +235,7 @@ def executeGenerator() {
     
     
     //If end is not set, determine end tag automatically using latest tag in current git working copy branch.
-    if(!resolvedEnd) {
+    if(!resolvedCommitOrTagEnd) {
         println "Determining End Tag from Latest tag in current Git branch..."
         def gitLatestTagCmd = "git describe --abbrev=0 --tags"
         def gitLatestTagResult = gitLatestTagCmd.execute().text
@@ -246,7 +246,7 @@ def executeGenerator() {
             System.exit(1)
         }
         tagEnd = gitLatestTagResult.split("\\r?\\n")[0]
-        resolvedEnd = tagEnd
+        resolvedCommitOrTagEnd = tagEnd
         println "Calculated End Tag is: ${tagEnd}"
         println ""
     }
@@ -254,7 +254,7 @@ def executeGenerator() {
     
     //Get Local Git Data
     println "Getting commits from current local Git working copy..."
-    def logCmd = "git log ${(resolvedStart ? resolvedStart + '..' : '')}${resolvedEnd} --pretty=format:%H --merges"
+    def logCmd = "git log ${(resolvedCommitOrTagStart ? resolvedCommitOrTagStart + '..' : '')}${resolvedCommitOrTagEnd} --pretty=format:%H --merges"
     def logResult = logCmd.execute().text
 
     if(!logResult) {
@@ -273,21 +273,25 @@ def executeGenerator() {
     def issuesResponse = getResourceFromGithub(repoApiUrl, "/issues?state=closed")
     def tagsResponse = getResourceFromGithub(repoApiUrl, "/tags")
     
-    def endTagCommitSha = null    
-    for(def tag : tagsResponse) {
-        if(tag.name.equals(tagEnd)) {
-            endTagCommitSha = tag.commit.sha
-            break
+    def endCommitSha = null
+    if(commitEnd) {
+        endCommitSha = commitEnd
+    } else if(tagEnd) {
+        for(def tag : tagsResponse) {
+            if(tag.name.equals(tagEnd)) {
+                endCommitSha = tag.commit.sha
+                break
+            }
         }
     }
     
-    if(!endTagCommitSha) {
+    if(!endCommitSha) {
         println "ERROR: Could not determine commit sha for tag '${tagEnd}'"
         System.exit(1)
     }
     
-    def tagCommitResponse = getResourceFromGithub(repoApiUrl, "/commits/${endTagCommitSha}")    
-    def tagEndDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss'Z'", tagCommitResponse.commit.author.date)
+    def endCommitResponse = getResourceFromGithub(repoApiUrl, "/commits/${endCommitSha}")    
+    def endCommitDate = Date.parse("yyyy-MM-dd'T'HH:mm:ss'Z'", endCommitResponse.commit.author.date)
 
     
     //Include only pull requests for commits of this version.
@@ -347,10 +351,10 @@ def executeGenerator() {
     sbChangelogTitle.append("# Change Log")
     sbChangelogTitle.append("\n\n")
 
-    sbChangelogTitle.append("## [${tagEnd}](${repoInfoResponse.html_url}/tree/${tagEnd}) (${tagEndDate.format('yyyy-MM-dd')})")
+    sbChangelogTitle.append("## ${endCommitDate.format('yyyy-MM-dd')} - ${(tagEnd ? tagEnd + ' - ' : '')}[Version Tree](${repoInfoResponse.html_url}/tree/${resolvedCommitOrTagEnd})")
     sbChangelogTitle.append("\n")
 
-    sbChangelogBody.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${tagStart}...${tagEnd})")
+    sbChangelogBody.append("[Full Changelog](${repoInfoResponse.html_url}/compare/${resolvedCommitOrTagStart}...${resolvedCommitOrTagEnd})")
     sbChangelogBody.append("\n")
 
     for(def pulls : pullByTitle) {

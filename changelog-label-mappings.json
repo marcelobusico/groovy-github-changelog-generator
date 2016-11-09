@@ -1,40 +1,50 @@
 {
     "mappings": [
-	{
-	    "labels": [
-		"analytics"
-	    ],
-	    "title": "Analytics changes"
-	},
-	{
-	    "labels": [
-		"bug", "problem"
-	    ],
-	    "title": "Bug fixes"
-	},
-	{
-	    "labels": [
-		"crash"
-	    ],
-	    "title": "Crash fixes"
-	},
-	{
-	    "labels": [
-		"enhancement"
-	    ],
-	    "title": "Enhancements"
-	},
-	{
-	    "labels": [
-		"translation"
-	    ],
-	    "title": "Translations"
-	},
-	{
-	    "labels": [
-		"GENERIC_LABEL"
-	    ],
-	    "title": "Merged Pull Requests"
-	}
+        {
+            "labels": [
+                "user story",
+                "user-story"
+            ],
+            "title": "User Stories"
+        },
+        {
+            "labels": [
+                "analytics"
+            ],
+            "title": "Analytics changes"
+        },
+        {
+            "labels": [
+                "bug", 
+                "problem",
+                "hotfix"
+            ],
+            "title": "Bug fixes"
+        },
+        {
+            "labels": [
+                "crash"
+            ],
+            "title": "Crash fixes"
+        },
+        {
+            "labels": [
+                "enhancement",
+                "improvement"
+            ],
+            "title": "Enhancements"
+        },
+        {
+            "labels": [
+                "translation"
+            ],
+            "title": "Translations"
+        },
+        {
+            "labels": [
+                "GENERIC_LABEL"
+            ],
+            "title": "Merged Pull Requests"
+        }
     ]
 }
