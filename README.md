@@ -15,8 +15,10 @@ alias generate_changelog='groovy PATH_TO_GENERATOR_SCRIPT/ChangelogGenerator.gro
 
 ## Usage
 
+```
 generate_changelog [--start-tag=TAG_START] [--end-tag=TAG_END] [--create-github-release=true/false]
 generate_changelog [--start-commit=COMMIT_START] [--end-commit=COMMIT_END] [--create-github-release=true/false]
+```
 
 ## Sample Commands
 
@@ -29,10 +31,12 @@ generate_changelog [--start-commit=COMMIT_START] [--end-commit=COMMIT_END] [--cr
 - Optionally you can add at the end of the script the modifier --create-github-release=true to create a new release in Github using specified tag and generated changelog.
 - If you get a 404 Not found error when creating a github release, probably you need to grant "repo" permission to your personal access token in Github settings.
 
+```
 generate_changelog --start-tag=v1.0 --end-tag=v2.0.2 --create-github-release=true
 generate_changelog --start-commit=e748bb55574739c821eae807a68c314b493615ab --end-commit=2365184c7c2db57220fbeb3d99abc5b15dde42d7 --create-github-release=true
 generate_changelog --start-tag=v1.0 --end-commit=2365184c7c2db57220fbeb3d99abc5b15dde42d7 --create-github-release=true
 generate_changelog --start-commit=e748bb55574739c821eae807a68c314b493615ab --end-tag=v2.0.2 --create-github-release=true
+```
 
 ## Sample Generated Github Release
 
